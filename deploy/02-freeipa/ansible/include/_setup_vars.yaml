@@ -1,0 +1,7 @@
+- name: Set vm local variables
+  set_fact:
+    virbr: "40"
+    netsuffix: "10" 
+    hostname: "idm"
+    rootvg_size: 30
+    

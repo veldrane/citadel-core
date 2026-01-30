@@ -1,0 +1,132 @@
+---
+- hosts: localhost
+  become: false
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "before-keycloak-configuration"
+    ignore_errors: yes
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+  
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: Get admin kerberos ticket
+    shell: echo "{{ adminpwd }}" | kinit {{ svcadmin }}
+
+  - name: Extend root fs
+    shell: lvextend -L +2GiB /dev/mapper/rootvg-root && resize2fs /dev/mapper/rootvg-root
+
+  - name: Create keycloak directory
+    shell: mkdir -p /opt/keycloak
+
+  - name: Add keycloak user to system
+    shell: useradd --shell /usr/sbin/nologin --home-dir /opt/keycloak keycloak 
+    ignore_errors: yes
+
+  - name: Download keycloak package
+    shell: curl -L https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.tar.gz --output /tmp/keycloak-{{ keycloak_version }}.tar.gz
+
+  - name: Extract keycloak package into target directory
+    shell: cd /opt/keycloak && tar xvfz /tmp/keycloak-{{ keycloak_version }}.tar.gz
+  
+  - name: Set ep capabilities for keycloak
+    shell: setcap 'cap_net_bind_service=+ep' /opt/keycloak/keycloak-{{ keycloak_version }}/bin/kc.sh
+
+  - name: Make a link to actual version
+    shell: cd /opt/keycloak && ln -s keycloak-{{ keycloak_version }} current
+
+  - name: Change ownership to keycloak
+    shell: chown -R keycloak:keycloak /opt/keycloak
+
+  - name: Create ssh key for idp and csr request for
+    shell: openssl req -new -newkey rsa:2048 -nodes -keyout /opt/keycloak/current/conf/idp.{{- domain -}}.key \
+           -out /tmp/idp.{{- domain -}}.csr \
+           -subj "/C=CZ/ST=Praha/L=Praha/O=SyscallX86/OU=IT/CN=idp.{{- domain -}}" \
+           -addext "subjectAltName=DNS:idp.{{- domain -}}"
+     
+  - name: Create certificate for idp
+    shell: ipa cert-request /tmp/idp.{{- domain -}}.csr \
+           --principal=host/idp.{{- domain -}}@{{- realm }} \ 
+           --certificate-out=/opt/keycloak/current/conf/idp.{{- domain -}}.crt
+    
+  - name: Add certificate and keys to conf
+    shell: echo -e "\nhttps-port=443\nhttps-certificate-file=\${kc.home.dir}/conf/idp.{{- domain -}}.crt\nhttps-certificate-key-file=\${kc.home.dir}/conf/idp.{{- domain -}}.key" \
+           >> /opt/keycloak/current/conf/keycloak.conf
+  
+  - name: Add keycloak hostname
+    shell: echo -e "hostname=idp.{{- domain }}" >> /opt/keycloak/current/conf/keycloak.conf
+
+  - name: Configure postgre database to keycloak
+    shell: echo -e "db=postgres\ndb-username={{- db_username }}\ndb-password={{- db_password }}\ndb-url=jdbc:postgresql://localhost/keycloak" \
+           >> /opt/keycloak/current/conf/keycloak.conf
+  
+  - name: Chown config to keycloak user
+    shell: chown -R keycloak.keycloak /opt/keycloak/current/conf
+
+  - name: Copy service definition to systemd directory
+    copy:
+      src: /{{ playbook_dir }}/templates/{{ item }}
+      dest: /usr/lib/systemd/system/keycloak.service
+    with_items:
+      - keycloak.service.template
+
+  - name: Reload systemd daemon
+    shell: systemctl daemon-reload
+    
+  - name: Enable keycloak service
+    shell: systemctl enable keycloak ; systemctl start keycloak
+  
+  - name: Check keycloak service status
+    shell: systemctl status keycloak
+    register: keycloak_status
+    ignore_errors: yes
+
+  - name: Start keycloak service again if not running
+    when: keycloak_status.rc != 0
+    shell: systemctl start keycloak
+  
+  - name: Wait for keycloak to start
+    pause:
+      seconds: 30
+  
+  - name: Restart keycloak service
+    shell: systemctl restart keycloak
+
+  - name: Wait for keycloak to start
+    pause:
+      seconds: 30
+
+  - name: Bootstrap keycloak - create admin user
+    shell: /opt/keycloak/current/bin/kc.sh bootstrap-admin user --username bootadmin --password:env PASSWORD
+    environment:
+      PASSWORD: "{{ kcadminpwd }}"

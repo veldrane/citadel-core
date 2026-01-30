@@ -1,0 +1,17 @@
+[hapee-base]
+name=hapee-base
+enabled=1
+baseurl=https://www.haproxy.com/download/hapee/key/<HAProxy Enterprise Key>-common/3.2r1/rhel-<VERSION>/$basearch/bin/
+gpgcheck=1
+ 
+[hapee-plus]
+name=hapee-plus
+enabled=1
+baseurl=https://www.haproxy.com/download/hapee/key/<HAProxy Enterprise Key>-plus/3.2r1/rhel-<VERSION>/$basearch/bin/
+gpgcheck=1
+ 
+[hapee-plus-extras]
+name=hapee-plus-extras
+enabled=1
+baseurl=https://www.haproxy.com/download/hapee/key/<HAProxy Enterprise Key>-plus/extras/rhel-<VERSION>/$basearch/bin/
+gpgcheck=1

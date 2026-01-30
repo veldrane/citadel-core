@@ -1,0 +1,46 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Get the krb5 ticket
+    shell: echo "{{ adminpwd }}" | kinit {{ svcadmin }}
+
+  - name: Remove spn from ipa
+    shell: ipa service-del {{ srv_name -}}/{{- fqdn -}}@{{ realm }}
+    ignore_errors: yes
+
+  - name: Remove srv record from ipa
+    shell: ipa dnsrecord-del {{ domain }} _{{- srv_name -}}._tcp --del-all
+    ignore_errors: yes
+
+  - name: Remove keytab
+    shell: rm -f /etc/{{- srv_name }}.keytab
+    ignore_errors: yes 
