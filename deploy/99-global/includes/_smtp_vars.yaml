@@ -1,0 +1,14 @@
+- name: Set smtp variables
+  set_fact:
+    smtp_host: "smtp.zoner.com"
+    smtp_port: 587
+    notification_from: "no-reply@syscallx86.com"
+    notification_subject: "kubernetes class notifcation"
+    notification_body: "Introduction"
+    smtp_user: "postmaster@syscallx86.com"
+    smtp_password: "MydNG16-2"
+    training_name: "Základy Kubernetes"
+    training_address: "Místo je uvedeno ve firemním kalendáři"
+    training_date: "2026-01-29 08:30:00"
+    public_jump_host: "jump.syscallx86.com"
+    github_url: "https://github.com/veldrane/kubernetes-labs"

@@ -1,0 +1,8 @@
+- name: Set vm local variables
+  set_fact:
+    virbr: "40"
+    netsuffix: "15" 
+    hostname: "idp"
+    rootvg_size: 40
+    srv_name: "idp"
+    srv_port: 443

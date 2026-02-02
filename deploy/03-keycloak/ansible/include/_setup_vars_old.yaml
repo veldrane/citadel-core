@@ -1,0 +1,44 @@
+- name: Set global variables
+  set_fact:
+    virbr: "8"
+    netsuffix: "23" 
+    hostname: "keycloak"
+    domain: "lab.syscallx86.com"
+    mem: "2G"
+    ipaserver: "freeipa.lab.syscallx86.com"
+    ipaip: "10.1.8.10"
+    nfsserver: "nfsnode.lab.syscallx86.com"
+    home_export: "/nfsvg/home"
+    ldapbase: "dc=lab,dc=syscallx86,dc=com"
+    svcadmin: "admin"
+    adminpwd: "admin1234"
+    template: "rocky9"
+    template_dir: "/data/templates"
+    vms_dir: "/data/vms"
+    rootvg_size: 30
+
+- name: Set Keycloak variables
+  set_fact:
+    keycloak_version: "26.0.5"
+    pg_jdbc_version: "42.7.4"
+    db_connection_string: "localhost:5432/keycloak"
+    db_username: "keycloak"
+    db_password: "keycloak12345"
+    kcusername: "keycloak"
+    kcadminpwd: "admin"
+    lvdata_size: "5G"
+
+
+- name: Set ip
+  set_fact:
+    ip: "10.1.{{ virbr  }}.{{ netsuffix }}"
+
+
+
+- name: Set FQDN
+  set_fact:
+    fqdn: "{{ hostname }}.{{ domain }}"
+
+- name: Set REALM
+  set_fact: 
+    realm: "{{ domain|upper }}"

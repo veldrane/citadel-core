@@ -1,0 +1,162 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - meta: end_play
+    when: k8s_role != "master"
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "before-kubeadm"
+    ignore_errors: yes
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ master }}" groups=master
+
+- hosts: master
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Restart chronyd
+    shell: systemctl restart chronyd
+  
+  - name: Extend var
+    shell: lvextend -L+6GiB /dev/mapper/rootvg-var ; resize2fs /dev/mapper/rootvg-var
+  
+  - name: Delete old ethernet interface
+    shell: nmcli con delete {{ iface }}
+
+  - name: Enable kubelet
+    shell: systemctl enable kubelet
+
+  - name: Modules for crio
+    shell: modprobe br_netfilter; sysctl -w net.ipv4.ip_forward=1
+
+  - name: Run kubeadm
+    shell: (
+      kubeadm init \
+      --pod-network-cidr={{ podnetwork }} \
+      --service-cidr={{ svcnetwork }} \
+      --apiserver-advertise-address={{ ip }} \
+      > /tmp/kubeadm.out
+    )
+
+  - name: Enable kubelet
+    shell: systemctl enable kubelet
+
+  - name: Get token 
+    shell: cat /tmp/kubeadm.out | grep -E '\-\-token' | awk '{print $5}'
+    register: kube_token
+  
+  - name: Recreate kube_token
+    shell: kubectl token delete {{ kube_token.stdout }} ; kubeadm token create
+
+  - name: Register new kube token
+    shell: kubeadm token list | tail -n 1 | awk '{print $1}'
+    register: bootstrap_token
+
+  - name: Get CA sha256
+    shell: cat /tmp/kubeadm.out | grep -E 'sha256' | awk '{print $2}'
+    register: ca_token
+
+  - name: Create Token file
+    shell: echo "{{ bootstrap_token.stdout }};{{ ca_token.stdout }}" > /root/token.out
+
+  - name: Create .kube directory
+    shell: mkdir -p /root/.kube
+
+  - name: Copy cfg to .kube dir
+    shell: cp -i /etc/kubernetes/admin.conf /root/.kube/config 
+ 
+  - name: Change ownership to kube directory
+    shell: chown $(id -u):$(id -g) /root/.kube/config
+
+  - name: Deploy krew
+    shell: (
+            set -x; cd "$(mktemp -d)" &&
+            OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+            ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+            KREW="krew-${OS}_${ARCH}" &&
+            curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+            tar zxvf "${KREW}.tar.gz" &&
+            ./"${KREW}" install krew
+            )
+    
+  - name: Add krew to path
+    ansible.builtin.blockinfile:
+      path: /root/.bashrc
+      marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      block: |
+        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" 
+
+  - name: Install kubectl krew plugins
+    shell: export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" && kubectl krew install ctx ns
+  
+  - name: Add openvswitdh bridge
+    shell: ovs-vsctl add-br br-int
+  
+  - name: Restart openvswitch
+    shell: systemctl restart openvswitch
+
+  - name: mkdir ovn-k8s dir
+    shell: mkdir /root/ovn-k8s
+
+  - name: Copy ovn-kubernetes manifests
+    ansible.builtin.copy:
+      src: ovn/
+      dest: /root/ovn-k8s/
+
+  - name: Create setup for ovn
+    ansible.builtin.template:
+       src: templates/ovn-setup.j2
+       dest: /root/ovn-k8s/ovn-setup.yaml
+
+  - name: Setup ovn-kubernetes
+    shell: kubectl apply -f /root/ovn-k8s/ovn-setup.yaml
+  
+  - name: Deploy rbac and crds of ovn-kubernetes
+    shell: find . -name "rbac-ovnkube*" -exec kubectl apply -f {} \;
+
+  - name: Deploy rbac and crds of ovn-kubernetes
+    shell: find . -name "k8s.ovn.org*" -exec kubectl apply -f {} \;
+
+  - name: Switch to ovn-kubernetes
+    shell: export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" && kubectl-ns ovn-kubernetes
+
+  - name: Deploy NB and SB ovs databases
+    shell: kubectl apply -f /root/ovn-k8s/ovnkube-db.yaml
+  
+  - name: Pause for 60 seconds
+    pause:
+      seconds: 60
+
+  - name: Deploy master
+    shell: kubectl apply -f /root/ovn-k8s/ovnkube-master.yaml
+
+  - name: Pause for 10 seconds
+    pause:
+      seconds: 20
+
+  - name: Deploy ovnkube daemon set
+    shell: kubectl apply -f /root/ovn-k8s/ovnkube-node.yaml
+  

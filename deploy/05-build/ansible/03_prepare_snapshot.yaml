@@ -1,0 +1,63 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Disable selinux
+    shell: grubby --update-kernel ALL --args selinux=0
+
+  - name: Power off the host
+    shell: poweroff
+    ignore_errors: yes
+
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: Delete all instalation related snapshots
+    shell: virsh snapshot-delete --children --domain {{ fqdn }} --snapshotname before-sw 
+    ignore_errors: yes
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "{{ build_snapshot }}"

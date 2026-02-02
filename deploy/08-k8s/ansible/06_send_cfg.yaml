@@ -1,0 +1,96 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for jumphost hosts"
+    add_host: name="{{- jumpserver -}}.{{- domain -}}" groups=jumphost
+
+  - name: Lookup master hostname record
+    shell: dig +short SRV _{{ srv_name -}}._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: master
+  
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ master.stdout }}" groups=master
+
+
+- hosts: master
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Copy kubernetes cfg
+    fetch:
+      src: /etc/kubernetes/admin.conf
+      dest: /tmp/kubeconfig.xxx
+      flat: yes
+  
+- hosts: jumphost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Copy kubernetes repo definition to yum dir
+    copy: 
+      src: include/kubernetes.repo
+      dest: /etc/yum.repos.d/kubernetes.repo
+  
+  - name: Install kubectl
+    shell: yum install -y kubectl
+
+  - name: Make kube config dir for student
+    shell: mkdir -p /home/veldrane/.kube
+    ignore_errors: yes
+
+  - name: copy file from local to machine2
+    copy: 
+      src: /tmp/kubeconfig.xxx 
+      dest: /home/veldrane/.kube/config
+
+  - name: Change owner of kube config
+    shell: chown -R veldrane:users /home/veldrane/.kube
+
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Remove kubeconfig
+    shell: rm -f /tmp/kubeconfig.xxx

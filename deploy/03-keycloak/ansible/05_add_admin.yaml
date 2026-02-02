@@ -1,0 +1,81 @@
+---
+- hosts: localhost
+  become: false
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+  
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: Create new admin in realm
+    community.general.keycloak_user:
+      auth_keycloak_url: https://idp.{{ domain }}
+      auth_username: bootadmin
+      auth_password: "{{- kcadminpwd -}}"
+      auth_realm: master
+      realm: master
+      username: admin
+      firstName: admin
+      lastName: admin
+      email: admin@{{ domain }}
+      enabled: true
+      emailVerified: true
+      credentials:
+        - type: password
+          value: "{{ adminpwd }}"
+          temporary: false
+      state: present
+      validate_certs: false
+  
+  - name: Map a realm role to a user, authentication with credentials
+    community.general.keycloak_user_rolemapping:
+      auth_keycloak_url: https://idp.{{ domain }}
+      auth_username: bootadmin
+      auth_password: "{{- kcadminpwd -}}"
+      auth_realm: master
+      realm: master
+      target_username: admin
+      roles:
+        - name: admin
+      validate_certs: false
+  
+
+  - name: Delete temporary admin user
+    community.general.keycloak_user:
+      auth_keycloak_url: https://idp.{{ domain }}
+      auth_username: bootadmin
+      auth_password: "{{- kcadminpwd -}}"
+      auth_realm: master
+      realm: master
+      username: bootadmin
+      state: absent
+      validate_certs: false

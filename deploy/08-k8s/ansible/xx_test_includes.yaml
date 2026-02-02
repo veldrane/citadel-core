@@ -1,0 +1,16 @@
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set vm local variables
+    set_fact:
+      k8s_role: "worker "
+
+
+  - name: Loop over multiple tasks for each user
+    ansible.builtin.include_tasks:
+      file: "_echo_message.yaml"
+    loop: "{{ range(1, 1) | list }}"
+    loop_control:
+      loop_var: student

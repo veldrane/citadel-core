@@ -1,0 +1,42 @@
+---
+- hosts: localhost
+  become: false
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+  
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: Bootstrap keycloak - create admin user
+    shell: /opt/keycloak/current/bin/kc.sh bootstrap-admin user --username admin --password:env PASSWORD
+    environment:
+      PASSWORD: "{{ kcadminpwd }}"

@@ -1,0 +1,49 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "ui-installation"
+    ignore_errors: yes
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Sync time
+    shell: systemctl restart chronyd
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Pull docker image
+    shell: docker pull jc21/registry-ui:latest
+
+  - name: Add ui to public registry
+    shell: docker tag jc21/registry-ui:latest {{ fqdn }}/registry-ui:latest ; docker push {{ fqdn }}/registry-ui:latest
+  
+  - name: Run ui
+    shell: docker run -d -it -p 80:80 -e REGISTRY_HOST={{- fqdn -}}:443 -e REGISTRY_STORAGE_DELETE_ENABLED=true \
+            -e REGISTRY_SSL=true -e REGISTRY_DOMAIN={{ fqdn -}}:443 --name registry-ui {{ fqdn }}/registry-ui:latest

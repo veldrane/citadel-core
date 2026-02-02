@@ -1,0 +1,54 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - meta: end_play
+    when: k8s_role != "worker"
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "before-deploy"
+    ignore_errors: yes
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: Lookup master hostname record
+    shell: dig +short SRV _{{ srv_name -}}._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: master
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ master.stdout }}" groups=master
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Add dashboard alias to br-ex
+    shell: nmcli con mod ovs-if-br-ex +ipv4.addresses 10.4.{{- subnet -}}.129/32
+
+  - name: Add simplapi alias to br-ex
+    shell: nmcli con mod ovs-if-br-ex +ipv4.addresses 10.4.{{- subnet -}}.130/32
+
+  - name: Restart network to apply changes
+    shell: nmcli dev reapply br-ex

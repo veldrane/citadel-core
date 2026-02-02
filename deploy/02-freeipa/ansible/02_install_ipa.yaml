@@ -1,0 +1,86 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }}
+    ignore_errors: yes
+
+  - name: Start machine
+    shell: virsh start {{ fqdn }}
+    ignore_errors: yes
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+  - pause:
+      seconds: 25
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Setup temporary external DNS
+    shell: nmcli connection modify enp1s0 ipv4.dns 8.8.8.8 ; systemctl restart NetworkManager
+
+  - name: Install prereq packages
+    shell: yum install ipa-server ipa-server-dns -y
+
+  - name: hostnamectl workarround 
+    shell: rm -f /usr/bin/hostnamectl ; ln -s /usr/bin/true /usr/bin/hostnamectl
+
+  - name: Allow https on firewalld
+    shell: firewall-cmd --add-service=https --add-service=ldap --add-service=ldaps --add-service=kerberos --add-service=kpasswd --add-service=dns --permanent ; firewall-cmd --reload
+
+  - name: Customize /etc/hosts
+    shell: sed -i -E "/{{ ip }}/d" /etc/hosts ; echo "{{ ip }} {{ fqdn }} {{ hostname }}" >> /etc/hosts
+
+  - name: Install ipa server
+    shell: ipa-server-install --ip-address={{ ip }} --hostname={{ fqdn }} --realm={{ realm }} --domain={{ domain }} --idstart 100000 \
+           --ds-password={{ adminpwd }} --admin-password={{ adminpwd }} --mkhomedir --setup-dns --unattended --forwarder=8.8.8.8
+  
+  - name: Add filters for named
+    ansible.builtin.blockinfile:
+      path: /etc/named/ipa-ext.conf
+      marker: "/* {mark} ANSIBLE MANAGED BLOCK */"
+      block: |
+        acl "trusted_network" {
+          127.0.0.1;
+          192.168.1.0/24;
+          10.4.0.0/16;
+          192.168.2.0/24;
+        };
+
+  - name: Add filters for named
+    ansible.builtin.blockinfile:
+      path: /etc/named/ipa-options-ext.conf
+      marker: "/* {mark} ANSIBLE MANAGED BLOCK */"
+      block: |
+        allow-recursion { trusted_network; };
+        allow-query-cache { trusted_network; };
+
+  - name: Customize /etc/hosts
+    shell: sed -i -E "s/dnssec-validation yes/dnssec-validation no/" /etc/named/ipa-options-ext.conf
+
+  - name: Restartd named
+    shell: systemctl restart named

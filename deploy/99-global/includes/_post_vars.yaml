@@ -1,0 +1,34 @@
+- name: Set subnet inside virbr
+  vars:
+    vlan_to_octet_map:
+      40: 0
+      41: 1
+      42: 2
+      43: 3
+      44: 4
+      45: 5
+      46: 6
+      47: 7
+      48: 8
+  set_fact:
+    subnet: "{{ vlan_to_octet_map[virbr | int] }}"
+
+- name: Set ip
+  set_fact:
+    ip: "10.{{ global_subnet }}.{{ subnet }}.{{ netsuffix }}"
+
+- name: set ipaip
+  set_fact:
+    ipaip: "10.{{ global_subnet }}.0.10"
+
+- name: Set FQDN
+  set_fact:
+    fqdn: "{{ hostname }}.{{ domain }}"
+
+- name: Set REALM
+  set_fact: 
+    realm: "{{ domain|upper }}"
+
+- name: Set vm
+  set_fact:
+    vm_dir: "{{ vms_dir }}/{{ fqdn }}"

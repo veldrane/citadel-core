@@ -1,0 +1,10 @@
+- name: Set Keycloak variables
+  set_fact:
+    keycloak_version: "26.5.2"
+    pg_jdbc_version: "42.7.4"
+    db_connection_string: "localhost:5432/keycloak"
+    db_username: "keycloak"
+    db_password: "keycloak12345"
+    kcusername: "keycloak"
+    kcadminpwd: "admin"
+    lvdata_size: "5G"

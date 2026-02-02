@@ -1,0 +1,51 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "before-sw"
+    ignore_errors: yes
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+
+  - name: Get the krb5 ticket
+    shell: echo "{{ adminpwd }}" | kinit {{ svcadmin }}
+
+  - name: Add spn to to ipa
+    shell: ipa service-add build/{{- fqdn -}}@{{ realm }}
+
+  - name: Get the keytab
+    shell: ipa-getkeytab -p build/{{- fqdn -}}@{{ realm }} -k /etc/build.keytab 
+
+  - name: Add srv record to ipa
+    shell: ipa dnsrecord-add {{ domain }} _build._tcp --srv-port=22 --srv-priority=0 --srv-weight=100 --srv-target=build
+    
+    
+

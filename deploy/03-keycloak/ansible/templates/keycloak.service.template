@@ -1,0 +1,20 @@
+[Unit]
+Description=Keycloak
+After=network.target syslog.target
+
+[Service]
+Type=idle
+User=keycloak
+Group=keycloak
+ExecStart=/opt/keycloak/current/bin/kc.sh start
+TimeoutStartSec=600
+TimeoutStopSec=600
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=keycloak
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,147 @@
+---
+- hosts: localhost
+  become: false
+  gather_facts: no
+  tasks:
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: Create temp directory for download
+    shell: mkdir {{ playbook_dir }}/temp
+    ignore_errors: yes
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "before-keycloak-installation"
+    ignore_errors: yes
+
+  - name: Prepare keycloak template coniguration
+    template:
+      src: templates/standalone.xml.{{ keycloak_version }}.template
+      dest: /{{ playbook_dir }}/temp/standalone.xml
+
+  - name: Prepare module.xml template
+    template:
+      src: templates/module.xml.template
+      dest: /{{ playbook_dir }}/temp/module.xml
+
+  - name: Prepare keycloak systemd template
+    template:
+      src: templates/keycloak.service.template
+      dest: /{{ playbook_dir }}/temp/keycloak.service
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+  
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+  
+  - name: Set keycloak variables
+    include: include/_keycloak_vars.yaml
+
+  - name: Copy binaries to /tmp
+    copy:
+      src: temp/{{ item }}
+      dest: /tmp
+    with_items:
+      - standalone.xml
+      - module.xml
+      - keycloak.service
+
+  - name: Check fs
+    shell: cat /etc/fstab| grep /data | grep -v -E '^#' | cut -d " " -f2
+    register: data_lv
+  
+  - name: Create data_lv for postgresql
+    shell: mkdir /data && lvcreate -n lv_data -L{{ lvdata_size }} rootvg && mkfs.ext4 /dev/mapper/rootvg-lv_data
+    when: data_lv.stdout == ""
+
+  - name: Add data_lv to fstab
+    shell: echo '/dev/mapper/rootvg-lv_data /data ext4 defaults 0 0' >> /etc/fstab
+    when: data_lv.stdout == ""
+
+  - name: Mount fs data
+    shell: mount /data
+    when: data_lv.stdout == ""
+
+  - name: Add 443 port to firewalld
+    shell: firewall-cmd --add-port=443/tcp --permanent && firewall-cmd --reload
+
+  - name: Install toolset
+    shell: dnf install -y wget tar java curl
+
+  - name: install postgresql
+    shell: dnf install -y postgresql postgresql-server postgresql-jdbc postgresql-private-libs postgresql-upgrade postgresql-contrib
+
+  - name: Create postgresql subdir
+    shell: mkdir /data/postgresql && chown postgres:postgres /data/postgresql
+
+  - name: Initdb 
+    shell: sudo -u postgres /usr/bin/initdb --pgdata=/data/postgresql
+
+  - name: Change directory for data
+    shell: sed -i -E 's/\/var\/lib\/pgsql\/data/\/data\/postgresql/g' /lib/systemd/system/postgresql.service
+
+  - name: Change SELinux context for postgresql
+    shell: semanage fcontext -a -t postgresql_db_t "/data(/.*)?" | restorecon -Rv /data
+
+  - name: Change SElinux context for data
+    shell: semanage fcontext -a -t var_lib_t "/data" | restorecon -Rv /data
+
+  - name: Enable and start postgresql
+    shell: systemctl enable postgresql && systemctl start postgresql
+
+  - name: Create user for keycloak db
+    shell: sudo -u postgres createuser {{ db_username }}
+    ignore_errors: yes
+
+  - name: Prepare keycloak systemd template
+    template:
+      src: templates/database.sql.template
+      dest: /data/postgresql/database.sql
+  
+  - name: Check pg_hba.conf records
+    shell: cat /data/postgresql/pg_hba.conf | grep keycloak
+    register: kc_record
+    ignore_errors: yes
+
+  - name: Allow access for keycloak user
+    shell: echo "local   all             keycloak                                md5" >> /data/postgresql/pg_hba.conf
+    when: kc_record.stdout == ""
+
+  - name: Restart postgresql
+    shell: systemctl restart postgresql
+
+  - name: Create database for keycloak
+    shell: sudo -u postgres psql -f /data/postgresql/database.sql
+
+
+- hosts: localhost
+  become: false
+  gather_facts: no
+  tasks:
+
+  - name: Set variables
+    include: include/_setup_vars.yaml
+
+  - name: Delete temp file
+    shell: rm -rf {{ playbook_dir }}/temp

@@ -1,0 +1,18 @@
+- name: Set vm local variables
+  set_fact:
+    virbr: "41"
+    netsuffix: "11" 
+    hostname: "ctl-8656ff-00001"
+    rootvg_size: 30
+    vcpus: 4
+    podnetwork: "10.38.0.0/16"
+    svcnetwork: "10.49.0.0/16"
+    clusterdom: "cluster.local"
+    master: "ctl-8656ff-00001.core.syscallx86.com"
+    bridge_name: "br-ex"
+    iface: "enp1s0"
+    ip_address: "10.4.1.11"
+    k8s_role: "master"
+    srv_name: "k8s-0001"
+    srv_port: 6443
+    srv_type: "confidential"

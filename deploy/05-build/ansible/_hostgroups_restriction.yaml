@@ -1,0 +1,5 @@
+- name: Create host group
+  shell: ipa hostgroup-add student{{- item -}}
+
+- name: Add jump into hostgroup
+  shell: ipa hostgroup-add-member student{{- item }} --hosts={{ fqdn }}

@@ -1,0 +1,19 @@
+- hosts: localhost
+  become: true
+  connection: local
+  gather_facts: no
+  tasks:
+
+  - name: Set create master env variables
+    ansible.builtin.template:
+       src: templates/master.j2
+       dest: include/_setup_vars.yaml
+    when: k8s_role == "master"
+
+
+  - name: Set create workser env variables
+    ansible.builtin.template:
+       src: templates/worker.j2
+       dest: include/_setup_vars.yaml
+    when: k8s_role == "worker"
+

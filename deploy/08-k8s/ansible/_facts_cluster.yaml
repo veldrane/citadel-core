@@ -1,0 +1,7 @@
+---
+- name: Set vm local variables
+  set_fact:
+    k8s_role: "master"
+
+- name: Loop over multiple tasks for each user
+  ansible.builtin.import_playbook: 01_prepare_nodes.yaml

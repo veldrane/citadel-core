@@ -1,0 +1,76 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="10.1.8.100" groups=rocky9
+
+  - name: Start machine
+    shell: virsh start rocky9
+    ignore_errors: yes
+
+- hosts: rocky9
+  become: true
+  gather_facts: no
+  tasks:
+
+  - pause:
+      seconds: 35
+  
+  - name: Update Rocky Linux 9
+    shell: yum -y update
+  
+  - name: Clean caches
+    shell: yum clean all
+  
+  - name: Restart server asynchronously
+    ansible.builtin.command: shutdown -r now
+    become: yes
+    async: 1
+    poll: 0
+    ignore_errors: yes
+
+
+- hosts: rocky9
+  become: true
+  gather_facts: no
+  tasks:
+
+  - pause:
+      seconds: 35
+
+  - name: Check if machine is up
+    shell: date
+  
+  - name: Restart server asynchronously
+    ansible.builtin.command: shutdown -h now
+    become: yes
+    async: 1
+    poll: 0
+    ignore_errors: yes
+
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - pause:
+      seconds: 10
+
+  - name: Delete old template
+    shell: rm -f /data/vms/templates/basevm.qcow2
+  
+  - name: Create new template
+    shell: virt-clone --original rocky9 --name basevm -f /data/vms/templates/basevm.qcow2
+  
+  - name: Register sysprep
+    shell: virt-sysprep --list-operations | egrep -v 'fs-uuids|lvm-uuids|ssh-userdir|ssh-hostkeys|bash-history' | awk '{ printf "%s,", $1}' | sed 's/,$//'
+    register: sysprep_ops
+
+  - name: Run sysprep
+    shell: virt-sysprep -d basevm --hostname basevm --enable '{{ sysprep_ops.stdout }}'
+
+  - name: Undefine basevm
+    shell: virsh undefine basevm
