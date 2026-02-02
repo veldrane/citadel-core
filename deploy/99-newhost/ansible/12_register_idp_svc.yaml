@@ -43,5 +43,22 @@
       auth_password: "{{- adminpwd -}}"
       auth_realm: master
       realm: "{{ domain}}"
-      client_id: "{{- srv_name -}}-api"
+      client_id: "{{- srv_name -}}"
       state: present
+    when: srv_type != "confidential"
+
+
+
+  - name: Create new client
+    community.general.keycloak_client:
+      auth_keycloak_url: https://idp.{{ domain }}
+      auth_username: admin
+      auth_password: "{{- adminpwd -}}"
+      auth_realm: master
+      realm: "{{ domain}}"
+      client_id: "{{- srv_name -}}"
+      state: present
+      public_client: false
+      client_authenticator_type: client-secret
+      standard_flow_enabled: true
+    when: srv_type == "confidential"

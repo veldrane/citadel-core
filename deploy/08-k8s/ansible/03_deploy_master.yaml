@@ -53,7 +53,13 @@
     shell: modprobe br_netfilter; sysctl -w net.ipv4.ip_forward=1
 
   - name: Run kubeadm
-    shell: kubeadm init --pod-network-cidr={{ podnetwork }} --service-cidr={{ svcnetwork }} --apiserver-advertise-address={{ ip }} > /tmp/kubeadm.out
+    shell: (
+      kubeadm init \
+      --pod-network-cidr={{ podnetwork }} \
+      --service-cidr={{ svcnetwork }} \
+      --apiserver-advertise-address={{ ip }} \
+      > /tmp/kubeadm.out
+    )
 
   - name: Enable kubelet
     shell: systemctl enable kubelet
