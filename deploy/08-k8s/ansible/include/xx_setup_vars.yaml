@@ -1,0 +1,19 @@
+- name: Set vm local variables
+  set_fact:
+    virbr: "4{{- student -}}"
+    netsuffix: "11" 
+    hostname: "master{{- student -}}{{ node_index }}"
+    rootvg_size: 20
+    vcpus: 4
+  when:
+    k8s_role == "master"
+    
+- name: Set vm local variables
+  set_fact:
+    virbr: "4{{- student -}}"
+    netsuffix: "21" 
+    hostname: "worker{{- student -}}{{ node_index }}"
+    rootvg_size: 20
+    vcpus: 4
+  when:
+    k8s_role == "worker"

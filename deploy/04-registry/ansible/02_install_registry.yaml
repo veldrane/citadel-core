@@ -1,0 +1,122 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "before registry installation"
+    ignore_errors: yes
+
+  - name: Create docker registry data disk
+    shell: qemu-img create -f qcow2 {{ vms_dir }}/{{ fqdn }}/datavg.qcow2 {{ disk_size }}
+
+  - name: Attach disk to machine
+    shell: virsh attach-disk {{ fqdn }} --source {{ vms_dir }}/{{ fqdn }}/datavg.qcow2 --target vdb --subdriver qcow2 --targetbus virtio --persistent
+
+  - name: Autostart of the machine
+    shell: virsh autostart {{ fqdn }}
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Setup firewall rules
+    shell: firewall-cmd --permanent --add-port=443/tcp ; firewall-cmd --reload
+
+  - name: LV extend /lv-var
+    shell: lvresize /dev/rootvg/var -L+10G
+
+  - name: Resize fs
+    shell: resize2fs /dev/rootvg/var
+
+  - name: Create datavg and logical volume
+    shell: pvcreate /dev/vdb ; vgcreate datavg /dev/vdb ; lvcreate -n registry -L20G datavg
+
+  - name: Create fs
+    shell: mkfs.ext4 /dev/datavg/registry
+
+  - name: make directory /data
+    shell: mkdir /data 
+
+  - name: Add /data to fstab
+    shell: echo '/dev/mapper/datavg-registry  /data              ext4    noatime,nodiratime        1 2' >> /etc/fstab
+
+  - name: Mount /data
+    shell: mount /data ; mkdir -p /data/registry/certs 
+
+  - name: Install prerequisites
+    shell: yum install -y yum-utils device-mapper-persistent-data lvm2 wget
+
+  - name: Add docker repo
+    shell: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+  - name: Install docker
+    shell: yum install -y docker-ce docker-ce-cli containerd.io
+
+  - name: Change docker.socket systemd definition
+    blockinfile:
+      path: /usr/lib/systemd/system/docker.socket
+      insertafter: "PartOf=docker.service"
+      block: |
+        After=network-online.target
+        Wants=network-online.target
+
+  - name: Enable and start docker
+    shell: systemctl enable docker ; systemctl start docker
+
+
+  - name: Get the krb5 ticket
+    shell: echo "{{ adminpwd }}" | kinit {{ svcadmin }}
+
+  - name: Add service
+    shell: ipa service-add HTTP/{{ fqdn }}@{{ realm }} --force
+
+  - name: Generate certificates
+    shell: ipa-getcert request -r -f /etc/pki/tls/certs/{{ fqdn }}.crt \ 
+           -k /etc/pki/tls/private/{{ fqdn }}.key \ 
+           -N CN={{ fqdn }} -D {{ fqdn }} \ 
+           -K HTTP/{{ fqdn }}@{{ realm }}
+
+  - pause:
+      seconds: 5
+
+  - name: Copy certs to right /data/certs location
+    shell: cat /etc/pki/tls/certs/{{ fqdn }}.crt /etc/ipa/ca.crt > /data/registry/certs/{{ fqdn }}.pem
+
+  - name: Copy keys to right /data/certs location
+    shell: cat /etc/pki/tls/private/{{ fqdn }}.key > /data/registry/certs/{{ fqdn }}.key
+
+  - name: Pull docker registry image
+    shell: docker pull registry:latest
+
+  - name: Start docker registry
+    shell: docker run --restart=always --name=docker-registry -d \
+           -v /data/registry:/var/lib/registry:Z -p 443:443 \ 
+           -e REGISTRY_HTTP_ADDR=0.0.0.0:443 \
+           -e REGISTRY_HTTP_TLS_CERTIFICATE=/var/lib/registry/certs/{{ fqdn }}.pem \
+           -e REGISTRY_HTTP_TLS_KEY=/var/lib/registry/certs/{{ fqdn }}.key \
+           -e REGISTRY_STORAGE_DELETE_ENABLED=true \
+           registry

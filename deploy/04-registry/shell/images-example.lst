@@ -1,0 +1,8 @@
+registry.k8s.io/coredns/coredns:v1.11.3
+registry.k8s.io/etcd:3.5.15-0
+registry.k8s.io/kube-apiserver:v1.30.9
+registry.k8s.io/kube-controller-manager:v1.30.9
+registry.k8s.io/kube-scheduler:v1.30.9
+quay.io/nmstate/kubernetes-nmstate-handler:v0.83.0
+quay.io/nmstate/kubernetes-nmstate-operator:v0.83.0
+quay.io/openshift/origin-kube-rbac-proxy:4.10.0

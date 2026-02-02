@@ -1,0 +1,11 @@
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Loop over multiple tasks for each user
+    ansible.builtin.include_tasks:
+      file: "_facts_cluster.yaml"
+    loop: "{{ range(1, 3) | list }}"
+    loop_control:
+      loop_var: student

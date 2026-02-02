@@ -1,0 +1,53 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for jumphost hosts"
+    add_host: name="{{- jumpserver -}}.{{- domain -}}" groups=jumphost
+
+- hosts: jumphost
+  become: true
+  become_user: veldrane
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Deploy krew
+    shell: (
+            set -x; cd "$(mktemp -d)" &&
+            OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+            ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+            KREW="krew-${OS}_${ARCH}" &&
+            curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+            tar zxvf "${KREW}.tar.gz" &&
+            ./"${KREW}" install krew
+            )
+    
+  - name: Add krew to path
+    ansible.builtin.blockinfile:
+      path: /home/veldrane/.bashrc
+      marker: "# {mark} ANSIBLE MANAGED BLOCK"
+      block: |
+        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" 
+
+  - name: Install kubectl krew plugins
+    shell: export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" && kubectl krew install ctx ns

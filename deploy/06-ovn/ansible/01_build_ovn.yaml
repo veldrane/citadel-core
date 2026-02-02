@@ -1,0 +1,75 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set REALM
+    set_fact: 
+      realm: "{{ domain|upper }}"
+
+  - name: Lookup build hostname record
+    shell: dig +short SRV _build._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: builddom
+
+  - name: Lookup SRV record
+    shell: export build_host=$(dig +short SRV _build._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g) && dig +short $build_host
+    register: buildsrv
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ buildsrv.stdout }}" groups=build
+
+  - name: Revert snapshot for the host
+    shell: virsh snapshot-revert --domain {{ builddom.stdout }} --snapshotname "{{ build_snapshot }}"
+
+  - name: Reboot the host
+    shell: virsh start --domain {{ builddom.stdout }}
+
+  - name: Wait for the host to be ready
+    pause:
+      seconds: 35
+
+- hosts: build
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Lookup build hostname record
+    shell: dig +short SRV _registry._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: registrydom
+
+  - name: Lookup SRV record
+    shell: export build_host=$(dig +short SRV _registry._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g) && dig +short $build_host
+    register: registry
+
+  - name: Install dev packages
+    shell: yum install -y gcc make autoconf automake libtool pkg-config go clang clang-devel \
+           docker git buildah
+
+  - name: Resize root fs
+    shell: lvresize --resizefs --size +20G /dev/mapper/rootvg-root && resize2fs /dev/mapper/rootvg-root
+
+  - name: Resize var fs
+    shell: lvresize --resizefs --size +10G /dev/mapper/rootvg-var && resize2fs /dev/mapper/rootvg-var
+
+  - name: Prepare build environment
+    shell: |
+      mkdir -p /opt/work/src/github.com/ovn-org &&
+      cd /opt/work/src/github.com/ovn-org &&
+      git clone https://github.com/ovn-org/ovn-kubernetes -b v1.2.0 &&
+      cd /opt/work/src/github.com/ovn-org/ovn-kubernetes/dist/images &&
+      pushd ../../go-controller &&
+      make &&
+      popd &&
+      find ../../go-controller/_output/go/bin/ -maxdepth 1 -type f -exec cp -f {} . \; &&
+      echo "ref: $(git rev-parse  --symbolic-full-name HEAD)  commit: $(git rev-parse  HEAD)" > git_info &&
+      buildah bud -t {{ registrydom.stdout -}}/ovn-kubernetes:v1.2.0 -f Dockerfile.fedora .
+  
+  - name: Push image to registry
+    shell: buildah push {{ registrydom.stdout -}}/ovn-kubernetes:v1.2.0
