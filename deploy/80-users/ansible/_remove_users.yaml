@@ -1,0 +1,8 @@
+---
+- name: Delete user
+  shell: ipa user-del {{ item.name }}
+  ignore_errors: yes
+
+- name: Delete user home
+  shell: rm -rf /home/{{ item.name }}
+  ignore_errors: yes

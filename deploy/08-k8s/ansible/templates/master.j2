@@ -1,6 +1,7 @@
 - name: Set vm local variables
   set_fact:
     virbr: "4{{- student -}}"
+    subvlan: "{{- student -}}"
     netsuffix: "1{{- node_index -}}" 
     hostname: "ctl-{{- suffix -}}-0000{{- node_index -}}"
     rootvg_size: 30

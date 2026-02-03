@@ -1,0 +1,49 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "before-sw"
+    ignore_errors: yes
+
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Change sshd configuration - password disabled"
+    shell: echo "PasswordAuthentication no" >> /etc/ssh/sshd_config
+
+  - name: Customize /etc/hosts
+    shell: sed -i -E "s/ChallengeResponseAuthentication yes/ChallengeResponseAuthentication no/" /etc/ssh/sshd_config.d/04-ipa.conf
+
+  - name: Enable tcp forwarding gateway
+    shell: echo "GatewayPorts yes" >> /etc/ssh/sshd_config
+
+  - name: "Restart sshd service"
+    shell: systemctl restart sshd
+

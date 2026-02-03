@@ -1,0 +1,9 @@
+- name: Set vm local variables
+  set_fact:
+    virbr: "40"
+    netsuffix: "23" 
+    hostname: "jump"
+    rootvg_size: 50
+    srv_name: "jump"
+    srv_port: 22
+    

@@ -1,0 +1,77 @@
+---
+- name: Create user
+  shell: ipa user-add {{ item.name }} --first=st --last=acc --uid 10000{{- item.idx }} --shell=/bin/bash --gid=100100
+
+- name: Change password
+  shell: echo "{{ user_password }}" | ipa user-mod {{ item.name }} --password
+
+- name: Change password expiration
+  shell:  ipa user-mod {{ item.name }} --password-expiration='2036-02-03 20:37:34Z'
+
+- name: Change ipa user group
+  shell:  ipa group-add-member users --user {{ item.name }}
+
+- name: Change ipa user group
+  shell:  ipa group-add-member wheel --user {{ item.name }}
+
+- name: Create home directory
+  ansible.builtin.file:
+    path: "/home/{{ item.name}}"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "users"
+    mode: "0755"
+
+- name: Create ssh in home directory
+  ansible.builtin.file:
+    path: "/home/{{ item.name }}/.ssh"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "users"
+    mode: "0700"
+
+- name: Create kube in home directory
+  ansible.builtin.file:
+    path: "/home/{{ item.name }}/.kube"
+    state: directory
+    owner: "{{ item.name }}"
+    group: "users"
+    mode: "0700"
+
+
+- name: Add .bashrc file for user
+  ansible.builtin.copy:
+    dest: "/home/{{ item.name }}/.bashrc"
+    content: |
+      # Custom bashrc for {{ item.name }}
+      alias ll='ls -l'
+    owner: "{{ item.name }}"
+    group: "users"
+    mode: "0644"
+
+- name: Copy ssh private key
+  ansible.builtin.copy:
+    src: /tmp/sshkeys/{{- item.name -}}/id_ecdsa
+    dest: /home/{{ item.name }}/.ssh/id_ecdsa
+    owner: "{{ item.name }}"
+    group: "users"
+    mode: "0400"
+
+- name: Copy ssh public key
+  ansible.builtin.copy:
+    src: /tmp/sshkeys/{{- item.name -}}/id_ecdsa.pub
+    dest: /home/{{ item.name }}/.ssh/id_ecdsa.pub
+    owner: "{{ item.name }}"
+    group: "users"
+    mode: "0400"
+
+- name: Add ssh public key to ipa for student{{ item }}
+  shell:  ipa user-mod {{ item.name }} --sshpubkey="$(cat /home/{{ item.name }}/.ssh/id_ecdsa.pub)"
+
+- name: Copy kube config to user's home
+  ansible.builtin.copy:
+    src: /tmp/kube/{{- item.name -}}/config
+    dest: /home/{{ item.name }}/.kube/config
+    owner: "{{ item.name }}"
+    group: "users"
+    mode: "0600"

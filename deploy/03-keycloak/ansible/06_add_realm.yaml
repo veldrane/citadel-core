@@ -96,7 +96,7 @@
         providerId: "group-ldap-mapper"
         providerType: "org.keycloak.storage.ldap.mappers.LDAPStorageMapper"
         config:
-          groups.dn: "cn=groups,cn=accounts,dc=class,dc=syscallx86,dc=com"
+          groups.dn: "cn=groups,cn=accounts,{{ ldapbase -}}"
           group.name.ldap.attribute: cn
           mode: "READ_ONLY"
       - name: "email"

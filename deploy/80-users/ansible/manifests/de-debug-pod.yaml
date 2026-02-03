@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  labels:
+    template: debug-pod
+  name: debug-pod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: debug-pod
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+      creationTimestamp: null
+      labels:
+        app: debug-pod
+      name: debug-pod
+    spec:
+      containers:
+      - env:
+        - name: TZ
+          value: Europe/Prague
+        image: registry.class.syscallx86.com/debug-pod:v1.0.0
+        imagePullPolicy: Always
+        name: debug-pod
+        resources:
+          limits:
+            cpu: 50m
+            memory: 100M
+          requests:
+            cpu: 50m
+            memory: 100M
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30

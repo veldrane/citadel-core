@@ -1,0 +1,54 @@
+# 01-init-config.yaml
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: "{{ ip_address }}"
+  bindPort: 6443
+nodeRegistration:
+  name: "{{ inventory_hostname }}"
+  criSocket: "{{ cri_socket | default('/var/run/crio/crio.sock') }}"
+  # kubeletExtraArgs:
+  #   cgroup-driver: systemd
+
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+clusterName: {{ srv_name }}
+kubernetesVersion: "{{ kubernetes_version | default('1.35.0') }}"
+imageRepository: registry.k8s.io
+certificatesDir: /etc/kubernetes/pki
+
+networking:
+  dnsDomain: cluster.local
+  podSubnet: {{ podnetwork }}
+  serviceSubnet: {{ svcnetwork }}
+
+etcd:
+  local:
+    dataDir: /var/lib/etcd
+
+apiServer: {}
+
+
+apiServer:
+  extraArgs:
+    - name: "oidc-issuer-url"
+      value: "https://{{- idp -}}/realms/{{- domain -}}"
+    - name: "oidc-client-id"
+      value: "k8s-000{{- subvlan -}}"
+    - name: "oidc-username-claim"
+      value: "prefered_username"
+    - name: "oidc-groups-claim"
+      value: "groups"
+    - name: "oidc-ca-file"
+      value: "/etc/kubernetes/pki/{{- domain }}.crt"
+    - name: "oidc-username-prefix"
+      value: "oidc:users:"
+    - name: "oidc-groups-prefix"
+      value: "oidc:groups:"
+
+
+controllerManager: {}
+scheduler: {}
+dns: {}
+proxy: {}

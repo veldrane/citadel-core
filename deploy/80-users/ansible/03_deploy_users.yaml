@@ -1,0 +1,84 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  vars_files:
+    - include/_users.yaml
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set global variables
+    include: include/_setup_vars.yaml
+
+  - name: Set local variables
+    include: include/_smtp_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Prepare ssh keys for each user
+    ansible.builtin.include_tasks:
+      file: "_prepare_keys.yaml"
+    loop: "{{ users }}"
+
+  - name: Prepare k8s environment each user
+    ansible.builtin.include_tasks:
+      file: "_prepare_k8s_env.yaml"
+    loop: "{{ users }}"
+
+  - name: Set REALM
+    set_fact: 
+      realm: "{{ domain|upper }}"
+
+  - name: Lookup jump hostname record
+    shell: dig +short SRV _jump._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: jumpdom
+
+  - name: Lookup SRV record
+    shell: export jump_host=$(dig +short SRV _jump._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g) && dig +short $jump_host
+    register: jumpsrv
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ jumpsrv.stdout }}" groups=jump
+
+- hosts: jump
+  become: true
+  gather_facts: no
+  vars_files:
+    - include/_users.yaml
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set global variables
+    include: include/_setup_vars.yaml
+
+  - name: Set local variables
+    include: include/_smtp_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+  
+  - name: Get the krb5 ticket
+    shell: echo "{{ adminpwd }}" | kinit {{ svcadmin }}
+
+  - name: Create user group
+    shell: ipa group-add users --gid=100100
+    ignore_errors: yes
+
+  - name: Create user group
+    shell: ipa group-add wheel --gid=10
+    ignore_errors: yes
+
+  - name: Loop over multiple tasks for each user
+    ansible.builtin.include_tasks:
+      file: "_prepare_users.yaml"
+    loop: "{{ users }}"
+
+  - name: Loop over multiple environment tasks for each user
+    ansible.builtin.include_tasks:
+      file: "_prepare_userenv.yaml"
+    loop: "{{ users }}"
