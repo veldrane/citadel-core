@@ -1,0 +1,12 @@
+---
+- name: Patch svc pres kubernetes.core.k8s s kubeconfig
+  become: true
+  become_user: "{{ item.name }}"
+  ansible.builtin.command:
+    cmd: /usr/bin/kubectl patch svc kubernetes-dashboard-kong-proxy -n dashboard --type=merge --patch-file=/dev/stdin
+    stdin: |
+      spec:
+        externalIPs:
+          - 10.4.{{- item.idx -}}.129
+  environment:
+    KUBECONFIG: /home/{{- item.name -}}/.kube/config

@@ -1,0 +1,19 @@
+---
+- name: Lookup cluster id record
+  shell: dig +short SRV _k8s-000{{- item.idx -}}._tcp.class.syscallx86.com | awk '{print $4}' | sed s/\.$//g | awk -F\. '{print $1}' | awk -F\- '{print $2}'
+  register: clusterid
+
+
+- name: Send notification email
+  ansible.builtin.mail:
+    host: "{{ smtp_host }}"
+    port: "587"
+    to: "{{ item.email }}"
+    subject: "Instrukce pro školení {{ training_name }}"
+    body: "{{ lookup('template', 'templates/welcome_email.j2', vars={'clusterid': clusterid.stdout}) }}"
+    subtype: html
+    from: "{{ notification_from }}"
+    username: "{{ smtp_user }}"
+    password: "{{ smtp_password }}"
+    attach:
+      - "/tmp/sshkeys/{{ item.name }}/{{- item.name -}}.zip"

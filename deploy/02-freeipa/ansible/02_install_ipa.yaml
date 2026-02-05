@@ -84,3 +84,10 @@
 
   - name: Restartd named
     shell: systemctl restart named
+  
+  - name: Get the krb5 ticket
+    shell: echo "{{ adminpwd }}" | kinit {{ svcadmin }}
+
+  - name: add reverse dns zone
+    shell: ipa dnszone-add {{ global_subnet }}.10. .in-addr.arpa. --name-server={{- fqdn -}}. \
+           --admin-email=hostmaster.{{- domain -}}. --dynamic-update=TRUE --allow-sync-ptr=TRUE

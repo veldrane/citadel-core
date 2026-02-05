@@ -1,0 +1,18 @@
+---
+- name: Get control plane cluster
+  shell: dig +short SRV _k8s-000{{- item.idx -}}._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+  register: k8s_master
+
+- name: Print control plane cluster
+  debug:
+    msg: "K8s Master IP is {{ k8s_master.stdout }}"
+
+- name: Clean config directory
+  shell: rm -rf /tmp/kube/{{- item.name -}} || true
+
+- name: "Create directory for kube config"
+  shell: mkdir -p /tmp/kube/{{- item.name -}}
+
+- name: Copy kube config from master
+  shell: |
+    scp -o StrictHostKeyChecking=no root@{{ k8s_master.stdout }}:/etc/kubernetes/admin.conf /tmp/kube/{{ item.name }}/config

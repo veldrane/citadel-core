@@ -1,0 +1,16 @@
+---
+- name: cleanup old ssh keys
+  shell: rm -rf /tmp/sshkeys/{{ item.name }}
+  ignore_errors: yes
+
+- name: Create ssh key directory
+  shell: mkdir -p /tmp/sshkeys/{{ item.name }} && chmod 700 /tmp/sshkeys/{{ item.name }}
+
+- name: Generate ssh key for {{ item.name }}
+  shell: ssh-keygen -t ecdsa -b 521 -f /tmp/sshkeys/{{ item.name }}/id_ecdsa -N "" -C "{{ item.name }}@{{ fqdn }}"
+
+- name: Convert ssh private key to putty format
+  shell: puttygen /tmp/sshkeys/{{ item.name }}/id_ecdsa -o /tmp/sshkeys/{{ item.name }}/id_ecdsa.ppk
+
+- name: Zip key with password
+  shell: cd /tmp/sshkeys/{{ item.name }}/ && zip -e {{ item.name -}}.zip id_ecdsa id_ecdsa.ppk -P "{{ user_password }}" 

@@ -1,0 +1,73 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Create snapshot for the host
+    shell: virsh snapshot-create-as --domain {{ fqdn }} --name "clean"
+    ignore_errors: yes
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Extend var
+    shell: lvextend -L+8GiB /dev/mapper/rootvg-var ; resize2fs /dev/mapper/rootvg-var
+
+  - name: Extend home
+    shell: lvextend -L+10GiB /dev/mapper/rootvg-home ; resize2fs /dev/mapper/rootvg-home
+
+  - name: Extend root
+    shell: lvextend -L+3GiB /dev/mapper/rootvg-root ; resize2fs /dev/mapper/rootvg-root
+
+  - name: Disable firewalld
+    shell: systemctl stop firewalld && systemctl disable firewalld
+  
+  - name: Copy kubernetes repo definition to yum dir
+    copy: 
+      src: include/kubernetes.repo
+      dest: /etc/yum.repos.d/kubernetes.repo
+  
+  - name: Copy crio repo definition to yum dir
+    copy: 
+      src: include/crio.repo
+      dest: /etc/yum.repos.d/crio.repo
+
+  - name: Install kubeadm, crio and wget
+    shell: yum install wget kubeadm cri-o kubelet libnetfilter_conntrack conntrack-tools socat kubectl tar curl git bash-completion -y
+
+  
+  - name: Install helm
+    shell: |
+      export PATH=$PATH:/usr/local/bin &&
+      curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 &&
+      chmod 700 get_helm.sh &&
+      ./get_helm.sh
+
+  - name: Enable bash completion for kubectl
+    shell: kubectl completion bash > /etc/bash_completion.d/kubectl

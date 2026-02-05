@@ -1,0 +1,25 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  vars_files:
+  - include/_users.yaml
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set global variables
+    include: include/_setup_vars.yaml
+
+  - name: Set local variables
+    include: include/_smtp_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  
+  - name: Loop over multiple tasks for each user
+    ansible.builtin.include_tasks:
+      file: "_send_notification.yaml"
+    loop: "{{ users }}"

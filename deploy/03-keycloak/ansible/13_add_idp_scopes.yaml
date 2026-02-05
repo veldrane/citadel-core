@@ -1,0 +1,63 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set REALM
+    set_fact: 
+      realm: "{{ domain|upper }}"
+
+  - name: Lookup idp hostname record
+    shell: dig +short SRV _idp._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: idpdom
+
+  - name: Lookup SRV record
+    shell: export idp_host=$(dig +short SRV _idp._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g) && dig +short $idp_host
+    register: idpsrv
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ idpsrv.stdout }}" groups=idp
+
+- hosts: idp
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Create a Keycloak client_scope with some custom attributes
+    community.general.keycloak_clientscope:
+      auth_keycloak_url: https://idp.{{ domain }}
+      auth_username: admin
+      auth_password: "{{- adminpwd -}}"
+      auth_realm: master
+      realm: "{{ domain}}"
+      name: k8s
+      description: Kubernetes client scope
+      protocol: openid-connect
+      validate_certs: false
+      state: present
+      protocol_mappers:
+        - config:
+            access.token.claim: true
+            full_group_path: false
+            claim.name: "groups"
+            id.token.claim: true
+            jsonType.label: String
+            user.attribute: groups
+            userinfo.token.claim: true
+          name: groups
+          protocol: openid-connect
+          protocolMapper: oidc-group-membership-mapper
+    delegate_to: localhost

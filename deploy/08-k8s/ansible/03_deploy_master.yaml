@@ -37,6 +37,14 @@
   - name: Set post variables
     include: include/_post_vars.yaml
 
+  - name: Lookup identity hostname record
+    shell: dig +short SRV _idp._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: idprecord
+  
+  - name: Set identity provider hostname
+    set_fact:
+      idp: "{{ idprecord.stdout }}"
+
   - name: Restart chronyd
     shell: systemctl restart chronyd
   
@@ -51,15 +59,17 @@
 
   - name: Modules for crio
     shell: modprobe br_netfilter; sysctl -w net.ipv4.ip_forward=1
+  
+  - name: Create kubeadm config from template
+    ansible.builtin.template:
+      src: templates/init-config.j2
+      dest: /root/init-config.yaml
+  
+  - name: Copy domain ca to /etc/kubernetes/pki
+    shell: mkdir /etc/kubernetes/pki && cp /etc/ipa/ca.crt /etc/kubernetes/pki/{{- domain }}.crt
 
   - name: Run kubeadm
-    shell: (
-      kubeadm init \
-      --pod-network-cidr={{ podnetwork }} \
-      --service-cidr={{ svcnetwork }} \
-      --apiserver-advertise-address={{ ip }} \
-      > /tmp/kubeadm.out
-    )
+    shell: kubeadm init --config=/root/init-config.yaml | tee /tmp/kubeadm.out
 
   - name: Enable kubelet
     shell: systemctl enable kubelet

@@ -1,0 +1,45 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Lookup master hostname record
+    shell: dig +short SRV _{{ srv_name -}}._tcp.{{- domain }} | awk '{print $4}' | sed s/\.$//g
+    register: master
+  
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ master.stdout }}" groups=master
+
+
+- hosts: master
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Set create master env variables
+    ansible.builtin.template:
+       src: templates/rbac.j2
+       dest: /tmp/rbacs.yaml
+
+  - name: Apply RBAC configuration to the cluster
+    shell: kubectl apply -f /tmp/rbacs.yaml
+    ignore_errors: yes

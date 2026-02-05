@@ -1,0 +1,6 @@
+---
+- name: Generate ssh keys
+  shell: su student{{- item }} -c "ssh-keygen -b 2048 -t rsa -f /home/student{{- item }}/.ssh/id_rsa -q -N \"\""
+
+- name: Add sshkey for user
+  shell: ipa user-mod student{{- item }} --sshpubkey="$(cat /home/student{{- item }}/.ssh/id_rsa.pub)"

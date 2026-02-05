@@ -1,0 +1,121 @@
+Ahoj,<BR>
+níže nalezneš důležité informace nadcházejícímu  školení <BR>
+
+<BR>
+<B>
+
+<B style="color:red;"> {{ training_name }}</B><BR><BR>
+
+Kde: {{ training_address }}<BR>
+Kdy: {{ training_date }}<BR><BR>
+
+Přístup na LAB:<BR><BR>
+
+ssh server: {{ public_jump_host }}<BR>
+port: 1022 <BR>
+username: {{ item.name }}<BR>
+heslo: není, použij klíč<BR>
+
+</B>
+<BR>
+
+Pro potřeby školení budeš potřebovat:<BR><BR>
+
+- vlastní notebook se kterým se dostaneš na internet<BR>
+- ssh klienta (putty/mobaxterm/openssh), který umí autentizaci privátním klíčem.<BR>
+- dobrou náladu ;)<BR>
+<BR>
+---<BR>
+<BR>
+**Přihlášení do LABu**<BR><BR>
+
+K připojení na jump server, ze kterého je pak přístup do lab infrastruktury použij následující příkaz (openssh verze):<BR><BR>
+
+    <i>
+    ssh -i ~/id_ecdsa {{ item.name }}@{{ public_jump_host }} -p 1022<BR><BR>
+    </i>
+
+    <b>
+    Pozor - TCP port pro připojení je nestandartně 1022!<BR><BR>
+    </b>
+
+
+**Upozornění**: V příloze tohoto e-mailu najdeš ZIP archiv s Tvým soukromým klíčem, který je zabezpečen heslem, které Ti sdělím<BR>
+na začátku školení. Před prvním přihlášením jej rozbal a případně nastav správná oprávnění:<BR><BR>
+
+    unzip {{ item.name }}.zip<BR>
+    chmod 600 id_ecdsa<BR>
+---<BR><BR>
+
+    <table style="border-collapse:collapse; border-spacing:0; table-layout: fixed; width: 493px;">
+    <colgroup>
+        <col style="width: 280px">
+        <col style="width: 53px">
+        <col style="width: 84px">
+        <col style="width: 84px">
+        <col style="width: 95px">
+    </colgroup>
+    <thead>
+        <tr>
+        <th style="background-color:#409cff; border:1px solid #9ABAD9; color:#fff; font-family:Arial, sans-serif; font-size:14px; font-weight:bold; padding:4px 5px; text-align:left; vertical-align:top;">Server</th>
+        <th style="background-color:#409cff; border:1px solid #9ABAD9; color:#fff; font-family:Arial, sans-serif; font-size:14px; font-weight:bold; padding:4px 5px; text-align:left; vertical-align:top;">Port</th>
+        <th style="background-color:#409cff; border:1px solid #9ABAD9; color:#fff; font-family:Arial, sans-serif; font-size:14px; font-weight:bold; padding:4px 5px; text-align:left; vertical-align:top;">Method</th>
+        <th style="background-color:#409cff; border:1px solid #9ABAD9; color:#fff; font-family:Arial, sans-serif; font-size:14px; font-weight:bold; padding:4px 5px; text-align:left; vertical-align:top;">Username</th>
+        <th style="background-color:#409cff; border:1px solid #9ABAD9; color:#fff; font-family:Arial, sans-serif; font-size:14px; font-weight:bold; padding:4px 5px; text-align:left; vertical-align:top;">Access</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">{{ public_jump_host }}</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">1022</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">ssh</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">{{ item.name }}</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">ssh key</td>
+        </tr>
+        <tr>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">https://console0{{- item.idx -}}.syscallx86.com</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">443</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">https</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">none</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">token</td>
+        </tr>
+        <tr>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">ctl-{{- clusterid.stdout -}}-0001.class.syscallx86.com</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">22</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">ssh</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">{{ item.name }}</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">no password</td>
+        </tr>
+        <tr>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">wks-{{- clusterid.stdout -}}-0001.class.syscallx86.com</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">22</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">ssh</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">{{ item.name }}</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">no password</td>
+        </tr>
+        <tr>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">wks-{{- clusterid.stdout -}}-0001.class.syscallx86.com</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">22</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">ssh</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">{{ item.name }}</td>
+        <td style="background-color:#EBF5FF; border:1px solid #9ABAD9; color:#444; font-family:Arial, sans-serif; font-size:14px; padding:4px 5px; text-align:left; vertical-align:top;">no password</td>
+        </tr>
+    </tbody>
+    </table>
+    <br><br>
+
+
+**Dokumentace a úlohy**<BR><BR>
+
+Veškeré informace k architektuře labu, přehled příkazů a samotné úlohy najdeš zde:<BR><BR>
+
+
+<a href="{{ github_url }}">{{ github_url }}</a><BR><BR>
+
+---<BR>
+
+V případě problémů se na mě neváhej obrátit, hodně štěstí a ať se Ti školení líbí!<BR><BR>
+
+HonzaD<BR>
+
+mob: +420734161610<BR>
