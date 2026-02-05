@@ -1,56 +1,80 @@
-# Identity Management – FreeIPA – 02_freeipa
+# Central Identity Provider – Keycloak – 03_keycloak
 
-This directory contains the deployment and configuration of the **FreeIPA server**,
-which acts as the **central Identity Management (IdM) system** for the entire infrastructure.
+This directory contains the deployment and configuration of **Keycloak**,
+which acts as the **central Identity Provider (IdP)** for the infrastructure.
 
-FreeIPA is a foundational component of the platform and serves as the single source of truth
-for identity, authentication, and service registration.
+Keycloak sits **on top of FreeIPA** and provides modern identity protocols
+(OIDC / OAuth2) to consumers such as Kubernetes and user-facing services.
 
 ## Role in the Infrastructure
 
-FreeIPA is used as the **authoritative identity backend**:
+Keycloak is responsible for **federating identities from FreeIPA** and exposing
+them in a form usable by modern platforms.
 
-- All servers in the infrastructure are registered in FreeIPA
-- All internal users and groups are defined and managed here
-- Authentication is centralized and consistent across services
-- Other systems (e.g. Keycloak, Kubernetes) build on top of FreeIPA
+Key design points:
 
-This design mirrors enterprise on‑prem identity architectures.
+- Keycloak is **not the source of truth**
+- FreeIPA remains the authoritative identity backend
+- Keycloak is a protocol translation and UX layer
 
-## Core Responsibilities
+This separation keeps identity ownership clean while enabling modern integrations.
 
-The FreeIPA server provides the following services:
+## Realm Model
 
-- **Identity Management**
-  - users, groups, hosts, and host groups
-  - centralized authentication and authorization primitives
+- A Keycloak **realm is generated automatically**
+- The realm name matches the **FreeIPA domain**
+- This creates a 1:1 conceptual mapping between IPA and Keycloak
 
-- **Certificate Authority**
-  - issues certificates for hosts and services
-  - supports service identities (SPNs) tied to certificates
-  - acts as a trusted CA for the internal infrastructure
+All users, groups, and relevant identity attributes are **synchronized from FreeIPA**
+into the corresponding Keycloak realm.
 
-- **Service Registration**
-  - registers services in the IPA directory
-  - creates and manages Service Principal Names (SPNs)
-  - enables Kerberos-based authentication flows
+## Identity Source
 
-- **DNS Management**
-  - authoritative DNS for internal zones
-  - automatic DNS registration for enrolled hosts
-  - management of forward and reverse zones
+Keycloak pulls **all identity data from FreeIPA**:
 
-- **Service Discovery**
-  - automatic creation of SRV records
-  - enabling dynamic discovery of infrastructure services
-  - used by higher-level components (e.g. IdP, Kubernetes)
+- users
+- groups
+- group membership
+- authentication credentials (via federation)
+
+No local users are intended to be managed directly in Keycloak.
+
+## Current Integrations
+
+At the current stage, Keycloak is integrated with:
+
+- **Kubernetes API Server**
+  - OIDC authentication
+  - user and group mapping for RBAC
+
+- **kubectl**
+  - OIDC-based login flow
+  - token acquisition via external login plugin
+
+- **Kubernetes Dashboard**
+  - protected by OAuth2 Proxy
+  - authentication delegated to Keycloak
+
+This provides a consistent authentication experience across core operational tooling.
+
+## Future Direction
+
+Planned future integrations include:
+
+- additional Kubernetes services (Prometheus, Grafana, etc.)
+- internal web applications
+- service-to-service authentication flows
+- broader OAuth2 / OIDC usage beyond Kubernetes
+
+Keycloak is intentionally introduced early to allow gradual expansion
+without redesigning the identity layer.
 
 ## Ansible Roles Overview
 
 The `ansible` subdirectory contains roles responsible for deploying and configuring
-the FreeIPA server.
+Keycloak and its integration with FreeIPA.
 
-Each role is designed to keep the identity layer explicit and reproducible.
+Each role focuses on a single responsibility to keep the identity stack understandable.
 
 ### Roles
 
@@ -58,56 +82,44 @@ Each role is designed to keep the identity layer explicit and reproducible.
   Base system preparation:
   - OS packages and updates
   - baseline system configuration
-  - prerequisites required by FreeIPA
+  - prerequisites for running Keycloak
 
-- **ipa-server**
-  Core FreeIPA server installation:
-  - FreeIPA server setup
-  - domain and realm initialization
-  - integrated DNS and CA configuration
+- **keycloak**
+  Core Keycloak deployment:
+  - Keycloak installation
+  - service configuration
+  - startup and lifecycle management
 
-- **ipa-dns**
-  DNS-specific configuration:
-  - forward and reverse DNS zones
-  - DNS policies and defaults
-  - enabling dynamic DNS updates
+- **keycloak-realm**
+  Realm bootstrap and configuration:
+  - automatic realm creation
+  - realm naming aligned with IPA domain
+  - base realm settings
 
-- **ipa-users**
-  Identity objects management:
-  - creation of internal users
-  - group definitions
-  - role-based grouping for infrastructure access
+- **keycloak-ipa-federation**
+  Identity federation with FreeIPA:
+  - LDAP / Kerberos federation setup
+  - user and group synchronization
+  - attribute mapping
 
-- **ipa-hosts**
-  Host enrollment and management:
-  - registering servers in IPA
-  - assigning host groups
-  - enabling automatic DNS registration
+- **keycloak-clients**
+  Client configuration:
+  - Kubernetes API server OIDC client
+  - kubectl login client
+  - OAuth2 Proxy client for Dashboard
 
-- **ipa-services**
-  Service and SPN registration:
-  - service principals
-  - Kerberos service identities
-  - preparation for certificate issuance
-
-- **ipa-certificates**
-  Certificate management:
-  - issuing service certificates
-  - CA trust distribution
-  - integration with consuming systems
-
-## Operational Notes
-
-- FreeIPA is a **critical dependency** for the entire platform
-- Loss or corruption of IPA data affects authentication globally
-- Regular backups of IPA data and CA material are strongly recommended
-- All higher-level identity systems (e.g. Keycloak) should be treated as consumers of IPA
+- **keycloak-hardening**
+  Security and operational hardening:
+  - HTTPS configuration
+  - token and session policies
+  - baseline security settings
 
 ## Design Philosophy
 
-FreeIPA is intentionally placed early in the deployment chain.
+Keycloak acts as a **bridge between traditional enterprise identity**
+and **modern cloud-native platforms**.
 
-Everything else — Kubernetes, Keycloak, service authentication —
-assumes a functioning and authoritative identity layer.
+FreeIPA defines *who* you are.
+Keycloak defines *how* you authenticate to modern systems.
 
-In short: **if IPA is wrong, everything above it is wrong too**.
+Keeping these roles separate preserves clarity, security, and long-term flexibility.
