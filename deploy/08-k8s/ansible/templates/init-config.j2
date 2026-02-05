@@ -7,8 +7,13 @@ localAPIEndpoint:
 nodeRegistration:
   name: "{{ inventory_hostname }}"
   criSocket: "{{ cri_socket | default('/var/run/crio/crio.sock') }}"
-  # kubeletExtraArgs:
-  #   cgroup-driver: systemd
+  kubeletExtraArgs:
+    - name: "cgroup-driver"
+      value: "systemd"
+    - name: "authentication-token-webhook"
+      value: "true"
+    - name: "authorization-mode"
+      value: "Webhook"
 
 ---
 apiVersion: kubeadm.k8s.io/v1beta4
@@ -37,15 +42,15 @@ apiServer:
     - name: "oidc-client-id"
       value: "k8s-000{{- subvlan -}}"
     - name: "oidc-username-claim"
-      value: "prefered_username"
+      value: "preferred_username"
     - name: "oidc-groups-claim"
       value: "groups"
     - name: "oidc-ca-file"
       value: "/etc/kubernetes/pki/{{- domain }}.crt"
     - name: "oidc-username-prefix"
-      value: "oidc:users:"
+      value: "idp:users:"
     - name: "oidc-groups-prefix"
-      value: "oidc:groups:"
+      value: "idp:groups:"
 
 
 controllerManager: {}
