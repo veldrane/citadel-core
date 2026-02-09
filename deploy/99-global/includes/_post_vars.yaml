@@ -17,6 +17,10 @@
   set_fact:
     ip: "10.{{ global_subnet }}.{{ subnet }}.{{ netsuffix }}"
 
+- name: Set gateway ip
+  set_fact:
+    gateway: "10.{{ global_subnet }}.{{ subnet }}.1"
+
 - name: set ipaip
   set_fact:
     ipaip: "10.{{ global_subnet }}.0.10"
