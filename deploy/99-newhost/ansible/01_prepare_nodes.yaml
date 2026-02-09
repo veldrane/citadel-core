@@ -15,12 +15,9 @@
 
   - name: "Create ansible group for new hosts"
     add_host: name="{{ ip }}" groups=newhost
-
+  
   - name: "Delete ssh keys for template"
-    shell: sed -i -E '/10.1.16.200/d' $HOME/.ssh/known_hosts
-
-  - name: "Delete ssh keys for ip"
-    shell: sed -i -E "/{{ ip }}/d" $HOME/.ssh/known_hosts
+    shell: ssh-keygen -R basevm
 
   - name: "Create ansible group for ipa server"
     add_host: name="{{ ipaip }}" groups=ipaserver
@@ -55,8 +52,20 @@
   gather_facts: no
   tasks:
 
-  - pause:
-      seconds: 35
+  - name: Wait for TCP/22 to open
+    ansible.builtin.wait_for:
+      host: "basevm"
+      port: 22
+      timeout: 600
+      delay: 2
+    delegate_to: localhost
+    become: false
+
+  - name: Wait for full SSH
+    ansible.builtin.wait_for_connection:
+      timeout: 600
+      delay: 2
+      sleep: 3
 
   - name: Set global variables
     include: include/_global_vars.yaml
@@ -85,6 +94,9 @@
 
   - name: Add an Ethernet connection with static IP configuration
     shell: nmcli connection modify enp1s0 ipv4.addresses {{  ip  }}/24 ipv4.method manual ipv4.dns "{{ ipaip }}"
+  
+  - name: Update default gateway
+    shell: nmcli connection modify enp1s0 ipv4.gateway {{ gateway -}}
 
   - name: Update packages
     shell: dnf update -y
