@@ -1,0 +1,75 @@
+<domain type='kvm'>
+  <name>router.core.syscallx86.com</name>
+
+  <memory unit='MiB'>2048</memory>
+  <vcpu placement='static'>2</vcpu>
+
+  <os>
+    <type arch='x86_64' machine='q35'>hvm</type>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+
+  <cpu mode='host-passthrough'/>
+
+  <clock offset='utc'/>
+
+  <devices>
+    <emulator>/usr/libexec/qemu-kvm</emulator>
+    <controller type='pci' index='0' model='pcie-root'/>
+    <controller type='pci' index='1' model='pcie-root-port'>
+    <model name='pcie-root-port'/>
+    <target chassis='1' port='0x8'/>
+    </controller>
+
+
+    <!-- System disk -->
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/data/vms/router.core.syscallx86.com/root.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+      <boot order='2'/>
+    </disk>
+
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw'/>
+      <source file='/data/iso/OPNsense-26.1-serial-amd64.img'/>
+      <target dev='sdb' bus='sata'/>
+      <boot order='1'/>
+    </disk>
+
+    <!-- Network: inside (K8s side) -->
+    <interface type='network'>
+      <source network='class'/>
+      <model type='virtio'/>
+      <vlan>
+        <tag id='41'/>
+      </vlan>
+    </interface>
+
+    <!-- Network: outside (edge side) -->
+    <interface type='network'>
+      <source network='class'/>
+      <model type='virtio'/>
+      <vlan>
+        <tag id='40'/>
+      </vlan>
+    </interface>
+
+    <!-- Serial console (very useful for FreeBSD) -->
+    <serial type='pty'>
+      <target port='0'/>
+    </serial>
+
+    <console type='pty'>
+      <target type='serial' port='0'/>
+    </console>
+
+    <graphics type='vnc' port='-1'/>
+    <input type='keyboard' bus='ps2'/>
+    <input type='mouse' bus='ps2'/>
+  </devices>
+</domain>

@@ -1,0 +1,7 @@
+- name: Set vm local variables
+  set_fact:
+    virbr: "41"
+    netsuffix: "253" 
+    hostname: "testvm"
+    srv_name: "testvm"
+    srv_port: 80
