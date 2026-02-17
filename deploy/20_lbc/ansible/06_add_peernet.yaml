@@ -1,0 +1,83 @@
+- hosts: localhost
+  become: true
+  gather_facts: no
+  connection: local
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for new hosts"
+    add_host: name="{{ ip }}" groups=newhost
+
+  - name: "Shutdown host"
+    shell: virsh shutdown {{ fqdn }} --mode acpi
+    ignore_errors: yes
+
+  - pause:
+      seconds: 5
+    
+  - name: "Destroy domain"
+    shell: "virsh destroy {{ fqdn }}"
+    ignore_errors: yes
+
+  - name: "Create xml definition file for networ2 from j2 template"
+    ansible.builtin.template:
+       src: templates/peer-eth.j2
+       dest: include/{{- fqdn -}}_network.xml
+
+  - name: "Define network"
+    shell: "virsh attach-device {{ fqdn }} include/{{- fqdn -}}_network.xml --config"
+
+  - name: "Start domain"
+    shell: "virsh start {{ fqdn }}"
+
+
+- hosts: newhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Wait for TCP/22 to open
+    ansible.builtin.wait_for:
+      host: "{{ ip }}"
+      port: 22
+      timeout: 600
+      delay: 2
+    delegate_to: localhost
+    become: false
+
+  - name: Wait for full SSH
+    ansible.builtin.wait_for_connection:
+      timeout: 600
+      delay: 2
+      sleep: 3
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+  
+  - name: Delete Wired connection
+    shell: nmcli connection delete Wired\ connection\ 1
+    ignore_errors: yes
+
+  - name: Configure new interface
+    shell: nmcli connection add \
+      type ethernet \
+      ifname enp7s0 \
+      con-name enp7s0 \
+      ipv4.method manual \
+      ipv4.addresses 192.168.9.6/29 \
+      ipv4.gateway  192.168.9.1 \
+      autoconnect yes

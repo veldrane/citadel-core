@@ -1,0 +1,18 @@
+- name: Set vm local variables
+  set_fact:
+    virbr: "4{{- student -}}"
+    peerbr: "49"
+    libvirtpeernet: "class"
+    netsuffix: "25{{- node_index -}}" 
+    hostname: "lbc-{{- suffix -}}-0000{{- node_index -}}"
+    rootvg_size: 30
+    vcpus: 2
+    podnetwork: "10.38.0.0/16"
+    svcnetwork: "10.49.0.0/16"
+    clusterdom: "cluster.local"
+    bridge_name: "br-ex"
+    iface: "enp1s0"
+    ip_address: "10.4.{{- student  -}}.25{{- node_index -}}"
+    k8s_role: "lbc"
+    srv_name: "k8s-000{{- student -}}"
+    srv_port: 6443
