@@ -1,0 +1,7 @@
+    <interface type='network'>
+      <source network='class'/>
+      <vlan>
+        <tag id='49'/>
+      </vlan>
+      <model type='virtio'/>
+    </interface>
