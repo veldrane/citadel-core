@@ -1,0 +1,57 @@
+---
+- hosts: localhost
+  become: true
+  gather_facts: no
+  tasks:
+
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: "Create ansible group for ipa server"
+    add_host: name="{{ ipaip }}" groups=ipaserver
+ 
+
+- hosts: ipaserver
+  become: true
+  gather_facts: no
+  tasks:
+  
+  - name: Set global variables
+    include: include/_global_vars.yaml
+
+  - name: Set local variables
+    include: include/_setup_vars.yaml
+
+  - name: Set post variables
+    include: include/_post_vars.yaml
+
+  - name: Get the krb5 ticket
+    shell: echo "{{ adminpwd }}" | kinit {{ svcadmin }}
+  
+  - name: Create zones for haproxy router
+    shell: ipa dnszone-add apps-000{{- subvlan -}}.{{ domain }} \ 
+          --admin-email=hostmaster@{{ domain }}
+  
+  - name: Create virtual host for haproxy router
+    shell: ipa host-add router.apps-000{{- subvlan -}}.{{ domain }} \
+          --ip-address=10.{{ global_subnet }}.{{ subnet }}.135
+
+  - name: Create k8s service for router
+    shell: ipa service-add HTTP/router.apps-000{{- subvlan -}}.{{ domain }}
+  
+  - name: Create ssh key for idp and csr request for
+    shell: openssl req -new -newkey rsa:2048 -nodes -keyout /tmp/router.apps-000{{- subvlan -}}.{{ domain }}.key \
+           -out /tmp/router.apps-000{{- subvlan -}}.{{ domain }}.csr \
+           -subj "/C=CZ/ST=Praha/L=Praha/O=SyscallX86/OU=IT/CN=router.apps-000{{- subvlan -}}.{{ domain }}"
+     
+  - name: Create certificate for idp
+    shell: ipa cert-request /tmp/router.apps-000{{- subvlan -}}.{{ domain }}.csr \
+           --principal=HTTP/router.apps-000{{- subvlan -}}.{{ domain }} \ 
+           --certificate-out=/tmp/router.apps-000{{- subvlan -}}.{{ domain }}.crt \
+           --profile=wildcard
